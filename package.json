@@ -1,0 +1,41 @@
+{
+  "name": "@kubescape/install",
+  "version": "0.1.0",
+  "description": "Installing kubescape binaries for third parties",
+  "publisher": "kubescape",
+  "author": {
+      "name": "David Delarosa",
+      "email": "xdavidel@gmail.com"
+  },
+  "main": "out/src/index.js",
+  "files": [
+    "out/src/index.d.ts"
+  ],
+  "scripts": {
+    "compile": "tsc -watch -p ./",
+    "test": "tsc -p ./ && tape -r source-map-support/register 'out/test/**/*.js' | tap-spec",
+    "prepare": "tsc -p ./"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/armosec/node-kubescape.git"
+  },
+  "keywords": [
+    "kubescape",
+    "kubernetes",
+    "vscode",
+    "lens",
+    "containers"
+  ],
+  "license": "Apache-2.0",
+  "dependencies": {
+    "abort-controller": "^3.0.0",
+    "node-fetch": "^2.6.0",
+    "which": "^2.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^13.13.4",
+    "@types/node-fetch": "^2.5.7",
+    "typescript": "^3.8.3"
+  }
+}
