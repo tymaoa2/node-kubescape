@@ -64,12 +64,17 @@ type UI = {
  * @param executable is the file needs to be executable
  * @returns the full path of the downloaded file
  */
-async function downloadFile(url : string, downloadDir : string, 
-    fileName : string, cancel : AbortController, ui : UI, executable = false) : Promise<string> {
+async function downloadFile(url : string, downloadDir : string,
+    fileName : string, abort : AbortController, ui : UI, executable = false) : Promise<string> {
     let localPath = path.resolve(__dirname, downloadDir, fileName)
     try {
-        await ui.progress("Downloading Kubescape", cancel, async(progress) => {
-            const response = await fetch(url, { signal: cancel.signal })
+        await ui.progress("Downloading Kubescape", abort, async(progress) => {
+            let opts : any = {
+            }
+            if (abort) {
+              opts.signal = abort.signal
+            }
+            const response = await fetch(url, opts)
             if (!response.ok || !response.body) {
                 ui.error(`Failed to download ${url}`)
                 throw new Error
@@ -136,10 +141,9 @@ async function getLetestVersionUrl() {
  * @returns true on success
  */
 export async function install(needsLatest : boolean,
-    kubescapeDir : string, ui : UI) : Promise<boolean> {
+    kubescapeDir : string, ui : UI, cancel : AbortController = null) : Promise<boolean> {
     /* set download url */
     let binaryUrl: string
-    const cancel = new AbortController()
 
     if (needsLatest) {
         binaryUrl = await getLetestVersionUrl();
