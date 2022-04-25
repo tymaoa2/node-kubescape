@@ -146,7 +146,8 @@ function expend(str : string) : string {
  * @returns the full path of the downloaded file
  */
 async function downloadFile(url : string, downloadDir : string,
-    fileName : string, abort : AbortController, ui : KubescapeUi, executable = false) : Promise<string> {
+    fileName : string, abort : AbortController | undefined,
+    ui : KubescapeUi, executable = false) : Promise<string> {
     let localPath = path.resolve(__dirname, downloadDir, fileName)
     try {
         await ui.progress("Downloading Kubescape", abort, async(progress) => {
@@ -164,6 +165,8 @@ async function downloadFile(url : string, downloadDir : string,
                 ui.error(`Failed to download ${url}`)
                 throw new Error
             }
+
+            ui.debug(`downloading kubescape status: ${response.statusText} (${response.status})`)
 
             const size = Number(response.headers.get('content-length'))
             let read = 0;
@@ -237,7 +240,7 @@ async function getLatestVersion() : Promise<string> {
  * @returns true on success
  */
 export async function install(version : string, kubescapeDir : string,
-    ui : KubescapeUi, cancel : AbortController = null) : Promise<boolean> {
+    ui : KubescapeUi, cancel : AbortController | undefined = undefined) : Promise<boolean> {
     /* set download url */
     let binaryUrl: string
 
@@ -652,8 +655,8 @@ export class KubescapeApi {
      * @param configs Kubescape configuration to respect
      * @returns True, on successful installs
      */
-    async setup (ui : KubescapeUi, configs : IKubescapeConfig) : Promise<boolean> {
-        const cancel = new AbortController()
+    async setup (ui : KubescapeUi, configs : IKubescapeConfig,
+        abort : AbortController | undefined = undefined) : Promise<boolean> {
         return await ui.progress("Initializing kubescape", null, async(progress) : Promise<boolean> => {
             /* initialize only once */
             if (this._isInitialized) return true
@@ -699,10 +702,10 @@ export class KubescapeApi {
             /* ---------------------------------------------------------------*/
             if (needsUpdate) {
                 ui.debug(`Kubescape needs to be updated to version: ${configs.version}`)
-                this._isInstalled = await install(configs.version, this.directory, ui, cancel)
+                this._isInstalled = await install(configs.version, this.directory, ui, abort)
                 if (!this.isInstalled) {
                     ui.error(ERROR_KUBESCAPE_NOT_INSTALLED)
-                    cancel.abort()
+                    abort.abort()
                     return false
                 }
 
