@@ -15,6 +15,7 @@ const TXT_LATEST = "latest"
 const PACKAGE_BASE_URL = "https://api.github.com/repos/armosec/kubescape/releases/latest"
 const PACKAGE_DOWNLOAD_BASE_URL = "https://github.com/armosec/kubescape/releases/download"
 
+const COMMAND_SCAN_CONTEXT = "--kube-context"
 const COMMAND_SCAN_FRAMEWORK = "scan framework"
 const COMMAND_LIST_FRAMEWORKS = "list frameworks"
 const COMMAND_DOWNLOAD_FRAMEWORK = "download framework"
@@ -588,6 +589,42 @@ export class KubescapeApi {
         ui.debug(`executing '${cmd}'`)
 
         return await ui.slow<any>("Kubescape scanning", async () => {
+            return new Promise<any>(resolve => {
+                cp.exec(cmd,
+                    async (err, stdout, stderr) => {
+                        if (err) {
+                            ui.error(stderr)
+                            resolve({})
+                            return
+                        }
+
+                        const res = stdout.toJsonArray()
+                        if (!res) {
+                            resolve({})
+                            return
+                        }
+
+                        resolve(res)
+                    })
+            })
+        })
+    }
+
+    /**
+     * Scan yaml files using Kubescape
+     * @param ui Swiss army tools for ui handling
+     * @param context The cluster context to use for scanning
+     * @returns JSON object with the results of the scan
+     */
+    async scanCluster(ui : KubescapeUi, context : string) {
+        const useArtifactsFrom = `--use-artifacts-from "${this.frameworkDirectory}"`
+        const scanFrameworks = this.frameworksNames.join(",")
+
+        const cmd = `${this.path} ${COMMAND_SCAN_FRAMEWORK} ${useArtifactsFrom} ${scanFrameworks} ${COMMAND_SCAN_CONTEXT} ${context} --format json`
+
+        ui.debug(`executing '${cmd}'`)
+
+        return await ui.slow<any>(`Kubescape scanning cluster ${context}`, async () => {
             return new Promise<any>(resolve => {
                 cp.exec(cmd,
                     async (err, stdout, stderr) => {
