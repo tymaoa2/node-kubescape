@@ -292,9 +292,10 @@ function getOsKubescapeName(directory : string) {
 }
 
 function getKubescapePath(basedir : string) : KubescapePath {
+    const escapedBaseDir = basedir.replace(' ', '\\ ');
     return {
-        baseDir : basedir,
-        fullPath : getOsKubescapeName(basedir),
+        baseDir : escapedBaseDir,
+        fullPath : getOsKubescapeName(escapedBaseDir),
     }
 }
 

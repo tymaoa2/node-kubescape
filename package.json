@@ -1,6 +1,6 @@
 {
   "name": "@kubescape/install",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Installing kubescape binaries for third parties",
   "publisher": "kubescape",
   "author": {
@@ -13,6 +13,7 @@
   ],
   "scripts": {
     "compile": "tsc -watch -p ./",
+    "start": "npm run compile",
     "test": "tsc -p ./ && tape -r source-map-support/register 'out/test/**/*.js' | tap-spec",
     "prepare": "tsc -p ./"
   },
