@@ -1,6 +1,6 @@
 {
   "name": "@kubescape/install",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Installing kubescape binaries for third parties",
   "publisher": "kubescape",
   "author": {
