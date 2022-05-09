@@ -433,7 +433,7 @@ export class KubescapeApi {
         return []
     }
 
-    _buildKubscapeCommand(command: string): string {
+    _buildKubescapeCommand(command: string): string {
         return `'${this.path}' ${command}`;
     }
 
@@ -442,7 +442,7 @@ export class KubescapeApi {
             throw new Error(ERROR_KUBESCAPE_NOT_INSTALLED)
         }
 
-        const cmd = this._buildKubscapeCommand(COMMAND_GET_VERSION);
+        const cmd = this._buildKubescapeCommand(COMMAND_GET_VERSION);
 
         let verInfo = new KubescapeVersion
         return new Promise<KubescapeVersion>(resolve => {
@@ -471,7 +471,7 @@ export class KubescapeApi {
     private async downloadMissingFrameworks(requiredFrameworks: string[], ui: KubescapeUi): Promise<string[]> {
         const promises = requiredFrameworks.map(framework =>
             new Promise<string>((resolve, reject) => {
-                const cmd = this._buildKubscapeCommand(`${COMMAND_DOWNLOAD_FRAMEWORK} ${framework} -o '${this.frameworkDirectory}'`);
+                const cmd = this._buildKubescapeCommand(`${COMMAND_DOWNLOAD_FRAMEWORK} ${framework} -o '${this.frameworkDirectory}'`);
                 cp.exec(cmd, (err, stdout, stderr) => {
                     if (err) {
                         reject(`Could not download framework ${framework}. Reason:\n${stderr}`)
@@ -488,7 +488,7 @@ export class KubescapeApi {
 
     private async downloadAllFrameworks(): Promise<string[]> {
         /* download all */
-        const cmd = this._buildKubscapeCommand(`${COMMAND_DOWNLOAD_ARTIFACTS} --output '${this.frameworkDirectory}'`);
+        const cmd = this._buildKubescapeCommand(`${COMMAND_DOWNLOAD_ARTIFACTS} --output '${this.frameworkDirectory}'`);
         return new Promise<string[]>(resolve => {
             cp.exec(cmd, (err, stdout, stderr) => {
                 let results: string[] = []
@@ -547,7 +547,7 @@ export class KubescapeApi {
      * @returns A list of available framework files
      */
     async getUninstalledFramework(): Promise<string[]> {
-        const cmd = this._buildKubscapeCommand(COMMAND_LIST_FRAMEWORKS);
+        const cmd = this._buildKubescapeCommand(COMMAND_LIST_FRAMEWORKS);
 
         return new Promise<string[]>(resolve => {
             cp.exec(cmd, (err, stdout, stderr) => {
@@ -574,7 +574,7 @@ export class KubescapeApi {
 
     /**
      * Install frameworks from backend locally
-     * @param frameworks A list of desired frameworks to install 
+     * @param frameworks A list of desired frameworks to install
      * @param ui Swiss army tools for ui handling
      */
     async installFrameworks(frameworks: string[], ui: KubescapeUi) {
@@ -605,7 +605,7 @@ export class KubescapeApi {
         const useArtifactsFrom = `--use-artifacts-from "${this.frameworkDirectory}"`
         const scanFrameworks = this.frameworksNames.join(",")
 
-        const cmd = this._buildKubscapeCommand(`${COMMAND_SCAN_FRAMEWORK} ${useArtifactsFrom} ${scanFrameworks} '${filePath}' --format json`);
+        const cmd = this._buildKubescapeCommand(`${COMMAND_SCAN_FRAMEWORK} ${useArtifactsFrom} ${scanFrameworks} '${filePath}' --format json`);
 
         ui.debug(`executing '${cmd}'`)
 
@@ -641,7 +641,7 @@ export class KubescapeApi {
         const useArtifactsFrom = `--use-artifacts-from "${this.frameworkDirectory}"`
         const scanFrameworks = this.frameworksNames.join(",")
 
-        const cmd = this._buildKubscapeCommand(`${COMMAND_SCAN_FRAMEWORK} ${useArtifactsFrom} ${scanFrameworks} ${COMMAND_SCAN_CONTEXT} ${context} --format json`);
+        const cmd = this._buildKubescapeCommand(`${COMMAND_SCAN_FRAMEWORK} ${useArtifactsFrom} ${scanFrameworks} ${COMMAND_SCAN_CONTEXT} ${context} --format json`);
 
         ui.debug(`executing '${cmd}'`)
 
@@ -651,8 +651,6 @@ export class KubescapeApi {
                     async (err, stdout, stderr) => {
                         if (err) {
                             ui.error(stderr)
-                            resolve({})
-                            return
                         }
 
                         const res = toJsonArray(stdout)
