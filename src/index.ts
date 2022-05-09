@@ -32,13 +32,7 @@ const IS_WINDOWS = process.platform === 'win32' ||
     process.env.OSTYPE === 'cygwin' ||
     process.env.OSTYPE === 'msys'
 
-declare global {
-    export interface String {
-        extractBetween(surround : string) : string
-        toJson() : any
-        toJsonArray() : any
-    }
-}
+const MAX_SCAN_BUFFER = 7 * 1024 * 1024
 
 String.prototype.extractBetween = function (this: string, surround: string) {
     return this.substring(
@@ -654,7 +648,7 @@ export class KubescapeApi {
 
         return await ui.slow<any>(`Kubescape scanning cluster ${context}`, async () => {
             return new Promise<any>(resolve => {
-                cp.exec(cmd,
+                cp.exec(cmd, {maxBuffer : MAX_SCAN_BUFFER },
                     async (err, stdout, stderr) => {
                         if (err) {
                             ui.error(stderr)
