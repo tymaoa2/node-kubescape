@@ -34,32 +34,31 @@ const IS_WINDOWS = process.platform === 'win32' ||
 
 const MAX_SCAN_BUFFER = 7 * 1024 * 1024
 
-String.prototype.extractBetween = function (this: string, surround: string) {
-    return this.substring(
-        this.indexOf(surround) + 1,
-        this.lastIndexOf(surround)
+const extractBetween = (str: string, surround: string) => {
+    return str.substring(
+        str.indexOf(surround) + 1,
+        str.lastIndexOf(surround)
     )
 }
 
-String.prototype.toJsonArray = function (): any {
-    let obj
-    let str = this.toString()
-
+const toJsonArray = (str : string) : any[] =>  {
+    let obj : any[]
     try {
-        if (this[0] !== '[') {
-            str = '[' + str + ']'
-        }
         obj = JSON.parse(str)
-    } catch {
+
+        if (!Array.isArray(obj)) {
+            obj = [obj]
+        }
+    } catch(e) {
+        console.error(e)
         obj = []
     }
-    
+
     return obj
 }
 
-String.prototype.toJson = function (): any {
+const toJson = (str : string): any => {
     let obj: {}
-    let str = this.toString()
 
     try {
         obj = JSON.parse(str)
@@ -292,8 +291,8 @@ function appendToFrameworks(to : any, from : KubescapeFramework[]) {
 function resolveKubescapeFrameworks(frameworkOutputs: string[]): KubescapeFramework[] {
     return frameworkOutputs.map(frameworkOutput => {
         const parts = frameworkOutput.split(':')
-        const frameworkName = parts[1].extractBetween("'")
-        const frameworkPath = parts[2].extractBetween("'")
+        const frameworkName = extractBetween(parts[1], "'")
+        const frameworkPath = extractBetween(parts[2], "'")
 
         return {
             name: frameworkName.toLocaleLowerCase(),
@@ -518,7 +517,7 @@ export class KubescapeApi {
                 if (file.endsWith('.json')) {
                     try {
                         const f_text = fs.readFileSync(decodeURIComponent(path.join(this.frameworkDirectory, file)), "utf8")
-                        const obj = f_text.toJson()
+                        const obj = toJson(f_text)
                         if (obj['controls']) {
                             return true
                         }
@@ -620,7 +619,7 @@ export class KubescapeApi {
                             return
                         }
 
-                        const res = stdout.toJsonArray()
+                        const res = toJsonArray(stdout)
                         if (!res) {
                             resolve({})
                             return
@@ -656,13 +655,13 @@ export class KubescapeApi {
                             return
                         }
 
-                        const res = stdout.toJsonArray()
-                        if (!res) {
-                            resolve({})
-                            return
+                        const res = toJsonArray(stdout)
+                        if (!res || res.length <= 0) {
+                            ui.error("not valid response was given")
+                            return resolve({})
                         }
 
-                        resolve(res)
+                        return resolve(res)
                     })
             })
         })
