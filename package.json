@@ -1,11 +1,11 @@
 {
   "name": "@kubescape/install",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "description": "Installing kubescape binaries for third parties",
   "publisher": "kubescape",
   "author": {
-      "name": "David Delarosa",
-      "email": "xdavidel@gmail.com"
+    "name": "David Delarosa",
+    "email": "xdavidel@gmail.com"
   },
   "main": "out/src/index.js",
   "files": [
