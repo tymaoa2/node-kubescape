@@ -164,7 +164,8 @@ function expand(str: string): string {
 async function downloadFile(url : string, downloadDir : string,
     fileName : string, abort : AbortController | undefined,
     ui : KubescapeUi, executable = false) : Promise<string> {
-    let localPath = path.resolve(__dirname, downloadDir, fileName)
+    const decodedTargetDir = decodeURIComponent(downloadDir)
+    let localPath = path.resolve(decodedTargetDir, fileName)
     try {
         await ui.progress("Downloading Kubescape", abort, async (progress) => {
             let opts: any = {
@@ -174,7 +175,7 @@ async function downloadFile(url : string, downloadDir : string,
             }
             ui.debug(`Attempt to download kubescape into '${localPath}'`)
             ui.debug(`creating ${downloadDir}`)
-            await fs.promises.mkdir(decodeURIComponent(downloadDir), { recursive: true })
+            await fs.promises.mkdir(decodedTargetDir, { recursive: true })
 
             const response = await fetch(url, opts)
             if (!response.ok || !response.body) {
@@ -182,7 +183,7 @@ async function downloadFile(url : string, downloadDir : string,
                 throw new Error
             }
 
-            ui.debug(`downloading kubescape status: ${response.statusText} (${response.status})`)
+            ui.debug(`Requesting kubescape status: ${response.statusText} (${response.status})`)
 
             const size = Number(response.headers.get('content-length'))
             let read = 0;
@@ -192,15 +193,14 @@ async function downloadFile(url : string, downloadDir : string,
                 progress(read / size)
             })
 
-            const decodedLocalPath = decodeURIComponent(localPath)
-            const out = fs.createWriteStream(decodedLocalPath)
+            const out = fs.createWriteStream(localPath)
             await promisify(stream.pipeline)(response.body, out).catch(e => {
-                fs.unlink(decodedLocalPath, (_) => null)
+                fs.unlink(localPath, (_) => null)
                 throw e
             })
 
             if (executable) {
-                await fs.promises.chmod(decodedLocalPath, fs.constants.S_IRWXU | fs.constants.S_IRWXG | fs.constants.S_IXOTH)
+                await fs.promises.chmod(localPath, fs.constants.S_IRWXU | fs.constants.S_IRWXG | fs.constants.S_IXOTH)
             }
             ui.info(`Successfully downloaded ${fileName} into ${downloadDir}`)
         })
@@ -210,7 +210,6 @@ async function downloadFile(url : string, downloadDir : string,
     } finally {
         return localPath
     }
-
 }
 
 /**
@@ -308,27 +307,23 @@ function getOsKubescapeFilename() {
 }
 
 function getKubescapePath(basedir: string): KubescapePath {
+    const decodedBaedir = path.resolve(decodeURIComponent(basedir))
     return {
-        baseDir: basedir,
-        fullPath: path.join(expand(basedir), getOsKubescapeFilename()),
+        baseDir: decodedBaedir,
+        fullPath: path.join(expand(decodedBaedir), getOsKubescapeFilename()),
     }
 }
 
 async function isKubescapeInstalled(kubescapePath: string): Promise<boolean> {
     return new Promise<boolean>(resolve => {
-        fs.stat(decodeURIComponent(kubescapePath), err => {
+        cp.exec(`"${kubescapePath}" ${COMMAND_GET_HELP}`, err => {
+            /* broken binary */
             if (err) {
+                console.error(err)
                 return resolve(false)
             }
 
-            cp.exec(`'${kubescapePath}' ${COMMAND_GET_HELP}`, err => {
-                /* broken binary */
-                if (err) {
-                    return resolve(false)
-                }
-
-                return resolve(true)
-            })
+            return resolve(true)
         })
     })
 }
@@ -434,7 +429,7 @@ export class KubescapeApi {
     }
 
     _buildKubescapeCommand(command: string): string {
-        return `'${this.path}' ${command}`;
+        return `"${this.path}" ${command}`;
     }
 
     private async getKubescapeVersion(): Promise<KubescapeVersion> {
@@ -471,7 +466,7 @@ export class KubescapeApi {
     private async downloadMissingFrameworks(requiredFrameworks: string[], ui: KubescapeUi): Promise<string[]> {
         const promises = requiredFrameworks.map(framework =>
             new Promise<string>((resolve, reject) => {
-                const cmd = this._buildKubescapeCommand(`${COMMAND_DOWNLOAD_FRAMEWORK} ${framework} -o '${this.frameworkDirectory}'`);
+                const cmd = this._buildKubescapeCommand(`${COMMAND_DOWNLOAD_FRAMEWORK} ${framework} -o "${this.frameworkDirectory}"`);
                 cp.exec(cmd, (err, stdout, stderr) => {
                     if (err) {
                         reject(`Could not download framework ${framework}. Reason:\n${stderr}`)
@@ -488,7 +483,7 @@ export class KubescapeApi {
 
     private async downloadAllFrameworks(): Promise<string[]> {
         /* download all */
-        const cmd = this._buildKubescapeCommand(`${COMMAND_DOWNLOAD_ARTIFACTS} --output '${this.frameworkDirectory}'`);
+        const cmd = this._buildKubescapeCommand(`${COMMAND_DOWNLOAD_ARTIFACTS} --output "${this.frameworkDirectory}"`);
         return new Promise<string[]>(resolve => {
             cp.exec(cmd, (err, stdout, stderr) => {
                 let results: string[] = []
@@ -605,9 +600,7 @@ export class KubescapeApi {
         const useArtifactsFrom = `--use-artifacts-from "${this.frameworkDirectory}"`
         const scanFrameworks = this.frameworksNames.join(",")
 
-        const cmd = this._buildKubescapeCommand(`${COMMAND_SCAN_FRAMEWORK} ${useArtifactsFrom} ${scanFrameworks} '${filePath}' --format json`);
-
-        ui.debug(`executing '${cmd}'`)
+        const cmd = this._buildKubescapeCommand(`${COMMAND_SCAN_FRAMEWORK} ${useArtifactsFrom} ${scanFrameworks} "${filePath}" --format json`);
 
         return await ui.slow<any>("Kubescape scanning", async () => {
             return new Promise<any>(resolve => {
@@ -642,8 +635,6 @@ export class KubescapeApi {
         const scanFrameworks = this.frameworksNames.join(",")
 
         const cmd = this._buildKubescapeCommand(`${COMMAND_SCAN_FRAMEWORK} ${useArtifactsFrom} ${scanFrameworks} ${COMMAND_SCAN_CONTEXT} ${context} --format json`);
-
-        ui.debug(`executing '${cmd}'`)
 
         return await ui.slow<any>(`Kubescape scanning cluster ${context}`, async () => {
             return new Promise<any>(resolve => {
