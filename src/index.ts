@@ -73,9 +73,9 @@ class KubescapeVersion {
     version: string
     isLatest: boolean
 
-    constructor() {
-        this.version = "unknown"
-        this.isLatest = true
+    constructor(version : string = "unknown", latest : boolean = true) {
+        this.version = version
+        this.isLatest = latest        
     }
 }
 
@@ -390,7 +390,8 @@ export class KubescapeApi {
     }
 
     get isLatestVersion() : boolean {
-        if (this._versionInfo) {
+        if (!this._versionInfo) {
+            console.log(this._versionInfo)
             throw new Error(ERROR_KUBESCAPE_NOT_INSTALLED)
         }
 
@@ -722,6 +723,11 @@ export class KubescapeApi {
             completedTasks++
             progress(completedTasks / tasksCount)
             ui.debug(`Using Kubescape version: ${this.version}`)
+
+            /* Set version if not already set */
+            if (!this._versionInfo) {
+                this._versionInfo = new KubescapeVersion(configs.version, false)
+            }
 
             /* 5. Initialize frameworks */
             /* ---------------------------------------------------------------*/
