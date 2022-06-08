@@ -251,7 +251,6 @@ async function getLatestVersion() : Promise<string> {
 
 /**
  * Install kubescape binary on the system
- * @param needsLatest Latest version or stable one
  * @param kubescapeDir Which directory should kubescape be located at
  * @param ui A set of UI fronts to display information graphically
  * @returns true on success
