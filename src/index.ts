@@ -157,6 +157,7 @@ function expand(str: string): string {
  * @param url download address
  * @param downloadDir target directory on the system
  * @param fileName save the download with this filename
+ * @param abort an option to abort the process
  * @param ui an external set os graphic fronts for displaying information
  * @param executable is the file needs to be executable
  * @returns the full path of the downloaded file
@@ -204,8 +205,8 @@ async function downloadFile(url : string, downloadDir : string,
             }
             ui.info(`Successfully downloaded ${fileName} into ${downloadDir}`)
         })
-    } catch {
-        ui.error(`Could not download ${url}`);
+    } catch (e) {
+        ui.error(`Could not download ${url}, reason: ${e}`);
         localPath = ""
     } finally {
         return localPath
