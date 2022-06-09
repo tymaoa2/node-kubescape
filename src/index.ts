@@ -338,7 +338,7 @@ export interface IKubescapeConfig {
 }
 
 export class KubescapeApi {
-    private static _instance: KubescapeApi = new KubescapeApi()
+    private static _instance: KubescapeApi | undefined = undefined
 
     private _isInitialized : boolean
     private _isInstalled: boolean
@@ -348,10 +348,6 @@ export class KubescapeApi {
     private _frameworks : any | undefined
 
     private constructor() {
-        if (!KubescapeApi._instance) {
-            KubescapeApi._instance = this
-        }
-
         this._isInitialized = false
         this._isInstalled = false
         this._path = undefined
@@ -360,6 +356,9 @@ export class KubescapeApi {
     }
 
     static get instance() : KubescapeApi {
+        if (!this._instance) {
+            this._instance = new KubescapeApi
+        }
         return this._instance
     }
 
