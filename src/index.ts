@@ -664,7 +664,7 @@ export class KubescapeApi {
      */
     async setup (ui : KubescapeUi, configs : IKubescapeConfig,
         abort : AbortController | undefined = undefined) : Promise<boolean> {
-        return await ui.progress("Initializing kubescape", null, async(progress) : Promise<boolean> => {
+        return ui.progress("Initializing kubescape", null, async(progress) : Promise<boolean> => {
             /* initialize only once */
             if (this._isInitialized) return true
 
@@ -784,6 +784,7 @@ export class KubescapeApi {
             progress(completedTasks / tasksCount)
             ui.debug(`Loaded frameworks ${this.frameworksNames}`)
 
+            this._isInitialized = true
             return true
         })
     }
