@@ -14,7 +14,7 @@
   "scripts": {
     "compile": "tsc -watch -p ./",
     "start": "npm run compile",
-    "test": "mocha -r ts-node/register test/index.ts --timeout 0",
+    "test": "jest --coverage",
     "prepare": "tsc -p ./"
   },
   "repository": {
@@ -35,14 +35,12 @@
     "which": "^2.0.2"
   },
   "devDependencies": {
-    "@types/mocha": "^9.1.1",
+    "@types/jest": "^28.1.1",
     "@types/node": "^13.13.4",
     "@types/node-fetch": "^2.5.7",
-    "chai": "^4.3.6",
-    "mocha": "^10.0.0",
-    "nyc": "^15.1.0",
-    "sinon": "^14.0.0",
     "ts-node": "^10.7.0",
-    "typescript": "^3.8.3"
+    "jest": "^28.1.1",
+    "ts-jest": "^28.0.4",
+    "typescript": "^4.3.0"
   }
 }
