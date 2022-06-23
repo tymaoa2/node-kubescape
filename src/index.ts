@@ -287,18 +287,20 @@ function appendToFrameworks(to : any, from : KubescapeFramework[]) {
     }
 }
 
-function resolveKubescapeFrameworks(frameworkOutputs: string[]): KubescapeFramework[] {
-    return frameworkOutputs.map(frameworkOutput => {
-        const parts = frameworkOutput.split(':')
-        const frameworkName = extractBetween(parts[1], "'")
-        const frameworkPath = extractBetween(parts[2], "'")
+function resolveKubescapeFramework(frameworkOutput : string) : KubescapeFramework {
+    const parts = frameworkOutput.split(':')
+    const frameworkName = extractBetween(parts[1], "'")
+    const frameworkPath = extractBetween(parts[2], "'")
 
-        return {
-            name: frameworkName.toLocaleLowerCase(),
-            location: frameworkPath,
-            isInstalled: false
-        }
-    })
+    return {
+        name: frameworkName.toLocaleLowerCase(),
+        location: frameworkPath,
+        isInstalled: false
+    }
+}
+
+function resolveKubescapeFrameworks(frameworkOutputs: string[]): KubescapeFramework[] {
+    return frameworkOutputs.map(frameworkOutput => resolveKubescapeFramework(frameworkOutput))
 }
 
 function getOsKubescapeFilename() {
@@ -429,7 +431,7 @@ export class KubescapeApi {
     }
 
     _buildKubescapeCommand(command: string): string {
-        return `"${this.path}" ${command}`;
+        return `"${this.path}" ${command}`
     }
 
     private async getKubescapeVersion(): Promise<KubescapeVersion> {
@@ -437,11 +439,14 @@ export class KubescapeApi {
             throw new Error(ERROR_KUBESCAPE_NOT_INSTALLED)
         }
 
+        const env : any = {}
+        env[ENV_SKIP_UPDATE_CHECK] = "1"
+
         const cmd = this._buildKubescapeCommand(COMMAND_GET_VERSION);
 
         let verInfo = new KubescapeVersion
         return new Promise<KubescapeVersion>(resolve => {
-            cp.exec(cmd, { env: { ENV_SKIP_UPDATE_CHECK: "1" } }, async (err, stdout, stderr) => {
+            cp.exec(cmd, { env: env }, async (err, stdout, stderr) => {
                 if (err) {
                     throw Error(stderr)
                 }
@@ -452,10 +457,8 @@ export class KubescapeApi {
                 if (match) {
                     verInfo.version = match[0]
 
-                    match = stderr.match(verRegex)
-                    if (match && match[0] !== verInfo.version) {
-                        verInfo.isLatest = false
-                    }
+                    const latestVersion = await getLatestVersion()
+                    verInfo.isLatest = latestVersion === verInfo.version
                 }
 
                 resolve(verInfo)
@@ -463,17 +466,28 @@ export class KubescapeApi {
         })
     }
 
-    private async downloadMissingFrameworks(requiredFrameworks: string[], ui: KubescapeUi): Promise<string[]> {
+    private async downloadMissingFrameworks(requiredFrameworks: string[], ui: KubescapeUi): Promise<KubescapeFramework[]> {
         const promises = requiredFrameworks.map(framework =>
-            new Promise<string>((resolve, reject) => {
+            new Promise<KubescapeFramework>((resolve, reject) => {
                 const cmd = this._buildKubescapeCommand(`${COMMAND_DOWNLOAD_FRAMEWORK} ${framework} -o "${this.frameworkDirectory}"`);
                 cp.exec(cmd, (err, stdout, stderr) => {
                     if (err) {
                         reject(`Could not download framework ${framework}. Reason:\n${stderr}`)
                     }
 
-                    /* match download artifacts command output */
-                    resolve(stdout.replace("'framework'", `'framework': '${framework}'`))
+                    if (this.version >= "v2.0.150") {
+                        const info = toJson(stderr)
+                        resolve({
+                            name : info.name.toLocaleLowerCase(),
+                            location : info.path,
+                            isInstalled : false
+                        })
+
+                    } else {
+                        /* match download artifacts command output */
+                        const res = stdout.replace("'framework'", `'framework': '${framework}'`)
+                        resolve(resolveKubescapeFramework(res))
+                    }
                 })
             })
         )
@@ -506,7 +520,7 @@ export class KubescapeApi {
      * @returns A list of installed framework files
      */
     async getInstalledFrameworks(): Promise<KubescapeFramework[]> {
-        let files = await fs.promises.readdir(decodeURIComponent(this.frameworkDirectory))
+        let files = await fs.promises.readdir(this.frameworkDirectory)
         let frameworkFiles = await new Promise<string[]>(resolve => {
             resolve(files.filter(file => {
                 if (file.endsWith('.json')) {
@@ -586,7 +600,7 @@ export class KubescapeApi {
             const newInstalledFrameworks = await this.downloadMissingFrameworks(frameworksNeedsDownload, ui)
             ui.debug(`New frameworks downloaded: ${newInstalledFrameworks}`)
 
-            appendToFrameworks(this._frameworks, resolveKubescapeFrameworks(newInstalledFrameworks))
+            appendToFrameworks(this._frameworks, newInstalledFrameworks)
         }
     }
 
@@ -600,7 +614,7 @@ export class KubescapeApi {
         const useArtifactsFrom = `--use-artifacts-from "${this.frameworkDirectory}"`
         const scanFrameworks = this.frameworksNames.join(",")
 
-        const cmd = this._buildKubescapeCommand(`${COMMAND_SCAN_FRAMEWORK} ${useArtifactsFrom} ${scanFrameworks} "${filePath}" --format json`);
+        const cmd = this._buildKubescapeCommand(`scan ${useArtifactsFrom} framework ${scanFrameworks} "${path.resolve(filePath)}" --format json`);
 
         return await ui.slow<any>("Kubescape scanning", async () => {
             return new Promise<any>(resolve => {
@@ -732,13 +746,12 @@ export class KubescapeApi {
             /* ---------------------------------------------------------------*/
             this._frameworks = {}
 
-            this._frameworkDir = configs.frameworksDirectory
+            this._frameworkDir = decodeURIComponent(expand(path.resolve(configs.frameworksDirectory)))
             if (this._frameworkDir && this._frameworkDir.length > 0) {
                 /* Get custom frameworks from specified directories */
                 try {
-                    this._frameworkDir = expand(this._frameworkDir)
-                    await fs.promises.mkdir(decodeURIComponent(this._frameworkDir), { recursive: true })
-                    await fs.promises.access(decodeURIComponent(this._frameworkDir))
+                    await fs.promises.mkdir(this._frameworkDir, { recursive: true })
+                    await fs.promises.access(this._frameworkDir)
                 } catch {
                     /* Fallback to kubescape directory */
                     ui.info(`Cannot access ${this._frameworkDir}. Using fallback instead.`)

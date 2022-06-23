@@ -1,4 +1,5 @@
 import * as fs from 'fs'
+import * as path from 'path'
 import AbortController from 'abort-controller'
 
 import { KubescapeApi, KubescapeUi, IKubescapeConfig } from '../src/index'
@@ -6,7 +7,7 @@ import { KubescapeApi, KubescapeUi, IKubescapeConfig } from '../src/index'
 const seconds = (n : number) => n * 1000
 const minutes = (n : number) => n * 1000 * 60 
 
-const DEFAULT_KUBESCAPE_VERSION = "v2.0.144";
+const DEFAULT_KUBESCAPE_VERSION = "v2.0.150";
 
 class TestUi implements KubescapeUi {
     info(msg: string): void {
@@ -50,18 +51,15 @@ describe('Kubescape Installation', ()=> {
     let kubescapeApi : KubescapeApi
     let frameworkdir : string
 
-    it('Should create a temp directory', ()=> {
+    beforeAll(async()=> {
         fs.mkdirSync(tmpdir, { recursive : true })
 
         expect(fs.existsSync(tmpdir)).toBeTruthy()
 
-        frameworkdir =  `${tmpdir}/frameworks`
+        frameworkdir = `${tmpdir}/frameworks`
         fs.mkdirSync(frameworkdir, { recursive: true })
 
         expect(fs.existsSync(frameworkdir)).toBeTruthy()
-    })
-
-    it(`Should install kubescape version ${DEFAULT_KUBESCAPE_VERSION}`, async ()=> {
 
         config = {
             version: DEFAULT_KUBESCAPE_VERSION,
@@ -94,9 +92,24 @@ describe('Kubescape Installation', ()=> {
         }
     })
 
-    it('Should clean the temp directory', ()=> {
+    it ('Should complete scan #1', async ()=> {
+        const priv1Res = await kubescapeApi.scanYaml(new TestUi, './test/assets/priv1.yaml')
+
+        expect(Object.keys(priv1Res).length).toBeGreaterThan(0)
+        const resToFramework : any = {}
+        priv1Res.forEach((r: { name: string })  => {
+            resToFramework[r.name.toLowerCase()] = r
+        })
+
+        for (let framework of requestedFrameworks) {
+
+            expect(resToFramework).toHaveProperty(framework.toLowerCase())
+        }
+    }, minutes(2))
+
+    afterAll(() => {
         fs.rmdirSync(tmpdir, { recursive: true })
-    
+
         expect(fs.existsSync(tmpdir)).toBeFalsy()
     })
 })
