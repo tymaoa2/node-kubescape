@@ -16,7 +16,8 @@
     "noFallthroughCasesInSwitch": true,
     "noImplicitAny": true,
     "noImplicitReturns": true,
-    "noImplicitThis": true
+    "noImplicitThis": true,
+    "esModuleInterop": true
   },
   "exclude": ["out", "node_modules", "test"]
 }

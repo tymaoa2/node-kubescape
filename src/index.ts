@@ -6,17 +6,17 @@ import * as stream from 'stream';
 
 import fetch from 'node-fetch'
 
+import compareVersions from 'compare-versions';
 import { promisify } from 'util';
 import { AbortController } from 'abort-controller';
 
-const KUBESCAPE = "kubescape"
 const TXT_LATEST = "latest"
 
 const PACKAGE_BASE_URL = "https://api.github.com/repos/armosec/kubescape/releases/latest"
 const PACKAGE_DOWNLOAD_BASE_URL = "https://github.com/armosec/kubescape/releases/download"
 
 const COMMAND_SCAN_CONTEXT = "--kube-context"
-const COMMAND_SCAN_FRAMEWORK = "scan framework"
+const COMMAND_SCAN = "scan"
 const COMMAND_LIST_FRAMEWORKS = "list frameworks"
 const COMMAND_DOWNLOAD_FRAMEWORK = "download framework"
 const COMMAND_DOWNLOAD_ARTIFACTS = "download artifacts"
@@ -475,14 +475,13 @@ export class KubescapeApi {
                         reject(`Could not download framework ${framework}. Reason:\n${stderr}`)
                     }
 
-                    if (this.version >= "v2.0.150") {
+                    if (compareVersions(this.version, "v2.0.150") >= 0) {
                         const info = toJson(stderr)
                         resolve({
                             name : info.name.toLocaleLowerCase(),
                             location : info.path,
                             isInstalled : false
                         })
-
                     } else {
                         /* match download artifacts command output */
                         const res = stdout.replace("'framework'", `'framework': '${framework}'`)
@@ -495,22 +494,43 @@ export class KubescapeApi {
         return Promise.all(promises)
     }
 
-    private async downloadAllFrameworks(): Promise<string[]> {
+    private async downloadAllFrameworks(ui: KubescapeUi): Promise<KubescapeFramework[]> {
         /* download all */
         const cmd = this._buildKubescapeCommand(`${COMMAND_DOWNLOAD_ARTIFACTS} --output "${this.frameworkDirectory}"`);
-        return new Promise<string[]>(resolve => {
+        return new Promise<KubescapeFramework[]>(resolve => {
             cp.exec(cmd, (err, stdout, stderr) => {
-                let results: string[] = []
+               
                 if (err) {
                     throw new Error(`Unable to download artifacts:\n${stderr}`)
                 }
 
-                const lineRegex = /\'framework'.+/g
-                stdout.match(lineRegex)?.forEach((e) => {
-                    results.push(e)
-                })
+                ui.debug(`stdout: ${stdout}, stderr: ${stderr}, version: ${this.version}`)
+                const stdoutLineRegex = /\'framework'.+/g
+                
+                if (compareVersions(this.version, "v2.0.150") >= 0 || !stdout.match(stdoutLineRegex) ) {
+                    let ksFrameworks: KubescapeFramework[] = []
+                    const output = stderr.split("\n")
+                    output.forEach(line => {
+                        const info = toJson(line)
+                        if (info.artifact == "framework") {
+                            ksFrameworks.push({
+                                    name : info.name.toLocaleLowerCase(),
+                                    location : info.path,
+                                    isInstalled : false
+                            })
+                        }
+                    })
 
-                resolve(results)
+                    resolve(ksFrameworks)
+                } else {
+                    let results: string[] = []
+
+                    stdout.match(stdoutLineRegex)?.forEach((e) => {
+                        results.push(e)
+                    })
+                    const ksFrameworks = resolveKubescapeFrameworks(results)
+                    resolve(ksFrameworks)
+                }             
             })
         })
     }
@@ -614,7 +634,7 @@ export class KubescapeApi {
         const useArtifactsFrom = `--use-artifacts-from "${this.frameworkDirectory}"`
         const scanFrameworks = this.frameworksNames.join(",")
 
-        const cmd = this._buildKubescapeCommand(`scan ${useArtifactsFrom} framework ${scanFrameworks} "${path.resolve(filePath)}" --format json`);
+        const cmd = this._buildKubescapeCommand(`${COMMAND_SCAN} ${useArtifactsFrom} framework ${scanFrameworks} "${path.resolve(filePath)}" --format json`);
 
         return await ui.slow<any>("Kubescape scanning", async () => {
             return new Promise<any>(resolve => {
@@ -647,8 +667,9 @@ export class KubescapeApi {
     async scanCluster(ui : KubescapeUi, context : string) {
         const useArtifactsFrom = `--use-artifacts-from "${this.frameworkDirectory}"`
         const scanFrameworks = this.frameworksNames.join(",")
-
-        const cmd = this._buildKubescapeCommand(`${COMMAND_SCAN_FRAMEWORK} ${useArtifactsFrom} ${scanFrameworks} ${COMMAND_SCAN_CONTEXT} ${context} --format json`);
+        
+        const cmd = this._buildKubescapeCommand(`${COMMAND_SCAN} ${useArtifactsFrom} framework ${scanFrameworks} ${COMMAND_SCAN_CONTEXT} ${context} --format json`);
+        ui.debug(`running kubescape command: ${cmd}`)
 
         return await ui.slow<any>(`Kubescape scanning cluster ${context}`, async () => {
             return new Promise<any>(resolve => {
@@ -657,10 +678,9 @@ export class KubescapeApi {
                         if (err) {
                             ui.error(stderr)
                         }
-
                         const res = toJsonArray(stdout)
                         if (!res || res.length <= 0) {
-                            ui.error("not valid response was given")
+                            ui.error(`not valid response was given. stdout: ${stdout}, stderr: ${stderr}`)
                             return resolve({})
                         }
 
@@ -778,8 +798,8 @@ export class KubescapeApi {
             } else {
                 /* Download all artifacts including all frameworks */
                 ui.debug("Requiring all the available frameworks")
-                const allFrameworks = await this.downloadAllFrameworks()
-                appendToFrameworks(this._frameworks, resolveKubescapeFrameworks(allFrameworks))
+                const allFrameworks = await this.downloadAllFrameworks(ui)
+                appendToFrameworks(this._frameworks, allFrameworks)
             }
             ui.debug(`Required frameworks: ${this.frameworks.map(f => f.name).join(' ')}`)
 
