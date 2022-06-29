@@ -470,7 +470,10 @@ export class KubescapeApi {
         const promises = requiredFrameworks.map(framework =>
             new Promise<KubescapeFramework>((resolve, reject) => {
                 const cmd = this._buildKubescapeCommand(`${COMMAND_DOWNLOAD_FRAMEWORK} ${framework} -o "${this.frameworkDirectory}"`);
+                ui.debug(`downloading missing frameworks. Command: ${cmd}`)
+
                 cp.exec(cmd, (err, stdout, stderr) => {
+                    ui.debug(`stdout: ${stdout}, stderr: ${stderr}`)
                     if (err) {
                         reject(`Could not download framework ${framework}. Reason:\n${stderr}`)
                     }
@@ -497,14 +500,15 @@ export class KubescapeApi {
     private async downloadAllFrameworks(ui: KubescapeUi): Promise<KubescapeFramework[]> {
         /* download all */
         const cmd = this._buildKubescapeCommand(`${COMMAND_DOWNLOAD_ARTIFACTS} --output "${this.frameworkDirectory}"`);
+        ui.debug(`downloading all frameworks. Command: ${cmd}`)
+
         return new Promise<KubescapeFramework[]>(resolve => {
             cp.exec(cmd, (err, stdout, stderr) => {
-               
+                ui.debug(`stdout: ${stdout}, stderr: ${stderr}, version: ${this.version}`)
                 if (err) {
                     throw new Error(`Unable to download artifacts:\n${stderr}`)
                 }
 
-                ui.debug(`stdout: ${stdout}, stderr: ${stderr}, version: ${this.version}`)
                 const stdoutLineRegex = /\'framework'.+/g
                 
                 if (compareVersions(this.version, "v2.0.150") >= 0 || !stdout.match(stdoutLineRegex) ) {
@@ -669,15 +673,17 @@ export class KubescapeApi {
         const scanFrameworks = this.frameworksNames.join(",")
         
         const cmd = this._buildKubescapeCommand(`${COMMAND_SCAN} ${useArtifactsFrom} framework ${scanFrameworks} ${COMMAND_SCAN_CONTEXT} ${context} --format json`);
-        ui.debug(`running kubescape command: ${cmd}`)
+        ui.debug(`running kubescape scan command: ${cmd}`)
 
         return await ui.slow<any>(`Kubescape scanning cluster ${context}`, async () => {
             return new Promise<any>(resolve => {
                 cp.exec(cmd, {maxBuffer : MAX_SCAN_BUFFER },
                     async (err, stdout, stderr) => {
+                        ui.debug(`stdout: ${stdout}, stderr: ${stderr}`)
                         if (err) {
                             ui.error(stderr)
                         }
+
                         const res = toJsonArray(stdout)
                         if (!res || res.length <= 0) {
                             ui.error(`not valid response was given. stdout: ${stdout}, stderr: ${stderr}`)
