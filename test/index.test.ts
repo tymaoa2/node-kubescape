@@ -107,6 +107,19 @@ describe('Kubescape Installation', ()=> {
         }
     }, minutes(2))
 
+    it ('Should build kubescape command with KUBECONFIG when provided', async() => {
+        expect(kubescapeApi._buildKubescapeCommand("scan")).toBe(`\"${kubescapeApi.path}\" scan`)
+        expect(kubescapeApi._buildKubescapeCommand("scan", "kubeconfig_path")).toBe(`KUBECONFIG=kubeconfig_path \"${kubescapeApi.path}\" scan`)
+
+        // mock process platform to test kubescape command for windows
+        const originalPlatform = process.platform;
+        Object.defineProperty(process, 'platform', { get: () => "win32" });
+        expect(kubescapeApi._buildKubescapeCommand("scan", "kubeconfig_path")).toBe(`set \"KUBECONFIG=kubeconfig_path\" & \"${kubescapeApi.path}\" scan`)
+        Object.defineProperty(process, 'platform', {  
+            value: originalPlatform
+        })
+    })
+
     afterAll(() => {
         fs.rmdirSync(tmpdir, { recursive: true })
 

@@ -27,11 +27,6 @@ const ERROR_KUBESCAPE_NOT_INSTALLED = "Kubescape is not installed!"
 
 const ENV_SKIP_UPDATE_CHECK = "KUBESCAPE_SKIP_UPDATE_CHECK"
 
-
-const IS_WINDOWS = process.platform === 'win32' ||
-    process.env.OSTYPE === 'cygwin' ||
-    process.env.OSTYPE === 'msys'
-
 const MAX_SCAN_BUFFER = 7 * 1024 * 1024
 
 const extractBetween = (str: string, surround: string) => {
@@ -227,6 +222,9 @@ function chooseKubescapeAsset() : string {
     return variants[os.platform()];
 }
 
+export function isWindows(): boolean {
+    return process.platform === 'win32' || process.env.OSTYPE === 'cygwin' || process.env.OSTYPE === 'msys'
+}
 
 /**
  * Finds the right latest version we have
@@ -269,7 +267,7 @@ export async function install(version : string, kubescapeDir : string,
     binaryUrl += `/${chooseKubescapeAsset()}`
 
     const kubescapeName = getOsKubescapeFilename();
-    const kubescapeFullPath = await downloadFile(binaryUrl, kubescapeDir, kubescapeName, cancel, ui, !IS_WINDOWS);
+    const kubescapeFullPath = await downloadFile(binaryUrl, kubescapeDir, kubescapeName, cancel, ui, !isWindows());
     if (kubescapeFullPath.length > 0) {
         return true
     }
@@ -430,8 +428,19 @@ export class KubescapeApi {
         return []
     }
 
-    _buildKubescapeCommand(command: string): string {
-        return `"${this.path}" ${command}`
+    _buildKubescapeCommand(command: string, kubeconfigPath?: string): string {
+        let kubescapeCommand = `"${this.path}" ${command}`
+
+        if (kubeconfigPath != null) {
+            if (isWindows()) {
+                kubescapeCommand = `set "KUBECONFIG=${kubeconfigPath}" & ${kubescapeCommand}`
+            }
+            else { 
+                kubescapeCommand = `KUBECONFIG=${kubeconfigPath} ${kubescapeCommand}`
+            }
+        }
+
+        return kubescapeCommand
     }
 
     private async getKubescapeVersion(): Promise<KubescapeVersion> {
@@ -668,11 +677,11 @@ export class KubescapeApi {
      * @param context The cluster context to use for scanning
      * @returns JSON object with the results of the scan
      */
-    async scanCluster(ui : KubescapeUi, context : string) {
+    async scanCluster(ui: KubescapeUi, context: string, kubeconfigPath?: string) {
         const useArtifactsFrom = `--use-artifacts-from "${this.frameworkDirectory}"`
         const scanFrameworks = this.frameworksNames.join(",")
         
-        const cmd = this._buildKubescapeCommand(`${COMMAND_SCAN} ${useArtifactsFrom} framework ${scanFrameworks} ${COMMAND_SCAN_CONTEXT} ${context} --format json`);
+        const cmd = this._buildKubescapeCommand(`${COMMAND_SCAN} ${useArtifactsFrom} framework ${scanFrameworks} ${COMMAND_SCAN_CONTEXT} ${context} --format json`, kubeconfigPath);
         ui.debug(`running kubescape scan command: ${cmd}`)
 
         return await ui.slow<any>(`Kubescape scanning cluster ${context}`, async () => {
