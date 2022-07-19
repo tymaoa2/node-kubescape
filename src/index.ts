@@ -27,7 +27,7 @@ const ERROR_KUBESCAPE_NOT_INSTALLED = "Kubescape is not installed!"
 
 const ENV_SKIP_UPDATE_CHECK = "KUBESCAPE_SKIP_UPDATE_CHECK"
 
-const MAX_SCAN_BUFFER = 7 * 1024 * 1024
+const MAX_SCAN_BUFFER = 100 * 1024 * 1024
 
 const extractBetween = (str: string, surround: string) => {
     return str.substring(
