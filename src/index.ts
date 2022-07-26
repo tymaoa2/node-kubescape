@@ -436,7 +436,7 @@ export class KubescapeApi {
                 kubescapeCommand = `set "KUBECONFIG=${kubeconfigPath}" & ${kubescapeCommand}`
             }
             else { 
-                kubescapeCommand = `KUBECONFIG=${kubeconfigPath} ${kubescapeCommand}`
+                kubescapeCommand = `KUBECONFIG="${kubeconfigPath}" ${kubescapeCommand}`
             }
         }
 

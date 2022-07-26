@@ -109,7 +109,7 @@ describe('Kubescape Installation', ()=> {
 
     it ('Should build kubescape command with KUBECONFIG when provided', async() => {
         expect(kubescapeApi._buildKubescapeCommand("scan")).toBe(`\"${kubescapeApi.path}\" scan`)
-        expect(kubescapeApi._buildKubescapeCommand("scan", "kubeconfig_path")).toBe(`KUBECONFIG=kubeconfig_path \"${kubescapeApi.path}\" scan`)
+        expect(kubescapeApi._buildKubescapeCommand("scan", "kubeconfig_path")).toBe(`KUBECONFIG=\"kubeconfig_path\" \"${kubescapeApi.path}\" scan`)
 
         // mock process platform to test kubescape command for windows
         const originalPlatform = process.platform;
