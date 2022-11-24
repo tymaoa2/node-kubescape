@@ -1,22 +1,22 @@
 import * as os from 'os';
-import * as fs  from 'fs'
-import * as path from 'path'
-import * as cp from 'child_process'
+import * as fs  from 'fs';
+import * as path from 'path';
+import * as cp from 'child_process';
 import * as stream from 'stream';
 
-import fetch from 'node-fetch'
+import fetch from 'node-fetch';
 
-import compareVersions from 'compare-versions';
+import { compareVersions } from 'compare-versions';
 import { promisify } from 'util';
 import { AbortController } from 'abort-controller';
+import { v4 as uuidv4 } from 'uuid';
 
 const TXT_LATEST = "latest"
 
 const PACKAGE_BASE_URL = "https://api.github.com/repos/armosec/kubescape/releases/latest"
 const PACKAGE_DOWNLOAD_BASE_URL = "https://github.com/armosec/kubescape/releases/download"
 
-const COMMAND_SCAN_CONTEXT = "--kube-context"
-const COMMAND_SCAN = "scan"
+const COMMAND_SCAN_FRAMEWORK = "scan framework"
 const COMMAND_LIST_FRAMEWORKS = "list frameworks"
 const COMMAND_DOWNLOAD_FRAMEWORK = "download framework"
 const COMMAND_DOWNLOAD_ARTIFACTS = "download artifacts"
@@ -328,6 +328,18 @@ async function isKubescapeInstalled(kubescapePath: string): Promise<boolean> {
     })
 }
 
+const withTempFile = (filename, fn) => withTempDir((dir) => fn(path.join(dir, filename)));
+
+const withTempDir = async (fn) => {
+	const dir = await fs.promises.mkdtemp(await fs.promises.realpath(os.tmpdir()) + path.sep);
+	try {
+		return await fn(dir);
+	}finally {
+        
+		fs.promises.rm(dir, {recursive: true});
+	}
+};
+
 
 export interface IKubescapeConfig {
     version : string
@@ -428,7 +440,22 @@ export class KubescapeApi {
         return []
     }
 
-    _buildKubescapeCommand(command: string, kubeconfigPath?: string): string {
+    get frameworkControlsData(): any {
+        const result = {};
+        for (let f of this.frameworks) {
+            const f_text = fs.readFileSync(decodeURIComponent(f.location), "utf8")
+            const obj = toJson(f_text)
+
+            if (obj['controls']) {
+                for (const c of obj['controls']) {
+                    result[c.controlID] = c
+                }
+            }
+        }
+        return result;
+    }
+
+    _buildKubescapeCommand(command: string, kubeconfigPath?: string, args?: any): string {
         let kubescapeCommand = `"${this.path}" ${command}`
 
         if (kubeconfigPath != null) {
@@ -438,6 +465,16 @@ export class KubescapeApi {
             else { 
                 kubescapeCommand = `KUBECONFIG="${kubeconfigPath}" ${kubescapeCommand}`
             }
+        }
+
+        if (args != null) {
+            for (const [key, value] of Object.entries(args)) {
+                if ((typeof value === 'boolean') && value) {
+                    kubescapeCommand = `${kubescapeCommand} --${key}`
+                } else {
+                    kubescapeCommand = `${kubescapeCommand} --${key} ${value}`
+                }
+              }
         }
 
         return kubescapeCommand
@@ -584,6 +621,33 @@ export class KubescapeApi {
         })
     }
 
+    async getControlsMap(): Promise<Map<string, any>> {
+        const controlsMap = new Map<string, any>()
+        let files = await fs.promises.readdir(this.frameworkDirectory)
+
+        files.forEach(
+            (file) => {
+                if (file.endsWith('.json')) {
+                    try {
+                        const f_text = fs.readFileSync(decodeURIComponent(path.join(this.frameworkDirectory, file)), "utf8")
+                        const obj = toJson(f_text)
+                        if (obj['controls']) {
+                            obj['controls'].forEach((control: any) => {
+                                if (!controlsMap.has(control.id)) {
+                                    controlsMap.set(control.id, control)
+                                }
+                            });
+                        }
+                    } catch {}
+                }
+        });
+    
+
+        return await new Promise(resolve => {
+            resolve(controlsMap)
+        })
+    }
+
     /**
      * Get backend available, yet uninstalled framework files
      * @returns A list of available framework files
@@ -641,68 +705,110 @@ export class KubescapeApi {
      * Scan yaml files using Kubescape
      * @param ui Swiss army tools for ui handling
      * @param filePath The file path to scan
+     * @param overrideArgs Override the default arguments
      * @returns JSON object with the results of the scan
      */
-    async scanYaml(ui : KubescapeUi, filePath : string) {
-        const useArtifactsFrom = `--use-artifacts-from "${this.frameworkDirectory}"`
-        const scanFrameworks = this.frameworksNames.join(",")
+    async scanYaml(ui : KubescapeUi, filePath: string, overrideArgs?: any) {
+        return await withTempFile(`report-${uuidv4()}.json`, async (file) => {
+            const args = {
+                "use-artifacts-from": `\"${this.frameworkDirectory}\"`,
+                "format": "json",
+                "format-version": "v2",
+                "output": `\"${file}\"`,
+                "keep-local": true,
+            }
 
-        const cmd = this._buildKubescapeCommand(`${COMMAND_SCAN} ${useArtifactsFrom} framework ${scanFrameworks} "${path.resolve(filePath)}" --format json`);
-
-        return await ui.slow<any>("Kubescape scanning", async () => {
-            return new Promise<any>(resolve => {
-                cp.exec(cmd,
-                    async (err, stdout, stderr) => {
-                        if (err) {
-                            ui.error(stderr)
-                            resolve({})
-                            return
-                        }
-
-                        const res = toJsonArray(stdout)
-                        if (!res) {
-                            resolve({})
-                            return
-                        }
-
-                        resolve(res)
-                    })
-            })
-        })
-    }
-
-    /**
-     * Scan yaml files using Kubescape
-     * @param ui Swiss army tools for ui handling
-     * @param context The cluster context to use for scanning
-     * @returns JSON object with the results of the scan
-     */
-    async scanCluster(ui: KubescapeUi, context: string, kubeconfigPath?: string) {
-        const useArtifactsFrom = `--use-artifacts-from "${this.frameworkDirectory}"`
-        const scanFrameworks = this.frameworksNames.join(",")
-        
-        const cmd = this._buildKubescapeCommand(`${COMMAND_SCAN} ${useArtifactsFrom} framework ${scanFrameworks} ${COMMAND_SCAN_CONTEXT} ${context} --format json`, kubeconfigPath);
-        ui.debug(`running kubescape scan command: ${cmd}`)
-
-        return await ui.slow<any>(`Kubescape scanning cluster ${context}`, async () => {
-            return new Promise<any>(resolve => {
-                cp.exec(cmd, {maxBuffer : MAX_SCAN_BUFFER },
-                    async (err, stdout, stderr) => {
+            if (overrideArgs) {
+                Object.assign(args, overrideArgs)
+            }
+            
+            const cmd = this._buildScanCommand(`"${path.resolve(filePath)}"`, null, args);
+            
+            return await ui.slow<any>("Kubescape scanning", async () => {
+                return new Promise<any>(resolve => {
+                    cp.exec(cmd, async (err, stdout, stderr) => {
                         ui.debug(`stdout: ${stdout}, stderr: ${stderr}`)
                         if (err) {
                             ui.error(stderr)
                         }
 
-                        const res = toJsonArray(stdout)
-                        if (!res || res.length <= 0) {
+                        var report = JSON.parse(fs.readFileSync(file, 'utf8'));
+                        if (!report) {
                             ui.error(`not valid response was given. stdout: ${stdout}, stderr: ${stderr}`)
                             return resolve({})
                         }
-
-                        return resolve(res)
+                        ui.debug('appending controls info to report')
+                        await this.appendControlsInformationToV2Report(report);
+                        return resolve(report)   
                     })
+                })
             })
         })
+    }
+
+    _buildScanCommand(pathInput?: string, kubeconfigPath?: string, args?: any): string {
+        const scanFrameworks = this.frameworksNames.join(",")
+        return this._buildKubescapeCommand(`${COMMAND_SCAN_FRAMEWORK} ${scanFrameworks} ${ pathInput ? pathInput : ''}`, kubeconfigPath, args)
+    }
+
+
+    /**
+     * Scan yaml files using Kubescape
+     * @param ui Swiss army tools for ui handling
+     * @param context The cluster context to use for scanning
+     * @param kubeconfigPath The kubeconfig path to use for scanning
+     * @param overrideArgs Override the default arguments
+     * @returns JSON object with the results of the scan
+     */
+    async scanCluster(ui: KubescapeUi, context: string, kubeconfigPath?: string, overrideArgs?: any) {
+        return await withTempFile(`report-${uuidv4()}.json`, async (file) => {
+            const args = {
+                "use-artifacts-from": `\"${this.frameworkDirectory}\"`,
+                "format": "json",
+                "format-version": "v2",
+                "output": `\"${file}\"`,
+                "keep-local": true,
+                "kube-context": context,
+            }
+
+            if (overrideArgs) {
+                Object.assign(args, overrideArgs)
+            }
+            
+            const cmd = this._buildScanCommand(null, kubeconfigPath, args);
+            ui.debug(`running kubescape scan command: ${cmd}`)
+    
+            return await ui.slow<any>(`Kubescape scanning cluster ${context}`, async () => {
+                return new Promise<any>(resolve => {
+                    cp.exec(cmd, {maxBuffer : MAX_SCAN_BUFFER },
+                        async (err, stdout, stderr) => {
+                            ui.debug(`stdout: ${stdout}, stderr: ${stderr}`)
+                            if (err) {
+                                ui.error(stderr)
+                            }
+
+                            var report = JSON.parse(fs.readFileSync(file, 'utf8'));
+                            if (!report) {
+                                ui.error(`not valid response was given. stdout: ${stdout}, stderr: ${stderr}`)
+                                return resolve({})
+                            }
+                            ui.debug('appending controls info to report')
+                            await this.appendControlsInformationToV2Report(report);
+                            return resolve(report)
+                        })
+                })
+            })
+        })
+    }
+
+    async appendControlsInformationToV2Report(report: any) {
+        const controlsMap = await this.getControlsMap()
+        for (let [controlId, control] of Object.entries(report.summaryDetails.controls)) {
+            if (controlsMap.has(controlId)) {
+                control['description'] = controlsMap.get(controlId)?.description
+                control['remediation'] = controlsMap.get(controlId)?.remediation
+            }
+        }
     }
 
     /**
@@ -776,14 +882,15 @@ export class KubescapeApi {
             if (!this._versionInfo) {
                 this._versionInfo = new KubescapeVersion(configs.version, false)
             }
-
-            /* 5. Initialize frameworks */
-            /* ---------------------------------------------------------------*/
+            
+            ui.debug("initializing frameworks")
             this._frameworks = {}
+            if (configs.frameworksDirectory) {
+                this._frameworkDir = decodeURIComponent(expand(path.resolve(configs.frameworksDirectory)))
+            }
 
-            this._frameworkDir = decodeURIComponent(expand(path.resolve(configs.frameworksDirectory)))
             if (this._frameworkDir && this._frameworkDir.length > 0) {
-                /* Get custom frameworks from specified directories */
+                ui.debug(`getting custom frameworks from specified directory: ${this._frameworkDir}`)
                 try {
                     await fs.promises.mkdir(this._frameworkDir, { recursive: true })
                     await fs.promises.access(this._frameworkDir)
@@ -793,7 +900,7 @@ export class KubescapeApi {
                     this._frameworkDir = this.directory
                 }
             } else {
-                /* Get available frameworks from kubescape directory */
+                ui.debug("getting available frameworks from kubescape directory")
                 this._frameworkDir = this.directory
             }
             appendToFrameworks(this._frameworks, await this.getInstalledFrameworks())
