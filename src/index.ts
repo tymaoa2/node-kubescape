@@ -614,7 +614,7 @@ export class KubescapeApi {
 
         return frameworkFiles.map(frameworkFile => {
             return {
-                name: frameworkFile.split('.')[0].toLocaleLowerCase(),
+                name: frameworkFile.split('.json')[0].toLocaleLowerCase(),
                 isInstalled: false,
                 location: expand(path.join(this.frameworkDirectory, frameworkFile))
             }
