@@ -633,8 +633,9 @@ export class KubescapeApi {
                         const obj = toJson(f_text)
                         if (obj['controls']) {
                             obj['controls'].forEach((control: any) => {
-                                if (!controlsMap.has(control.id)) {
-                                    controlsMap.set(control.id, control)
+                                const controlID = control?.id ?? control.controlID
+                                if (!controlsMap.has(controlID)) {
+                                    controlsMap.set(controlID, control)
                                 }
                             });
                         }
