@@ -213,10 +213,19 @@ async function downloadFile(url : string, downloadDir : string,
  * @returns The right asset name depended on the system
  */
 function chooseKubescapeAsset() : string {
+    let prefix = "kubescape"
+    switch(os.arch()) {
+        case 'arm64':
+            prefix += "-arm64"
+            break
+        default:
+            break
+    }
+
     const variants: { [key: string]: string } = {
-        "linux": "kubescape-ubuntu-latest",
-        "darwin": "kubescape-macos-latest",
-        "win32": "kubescape-windows-latest"
+        "linux": prefix + "-ubuntu-latest",
+        "darwin": prefix + "-macos-latest",
+        "win32": prefix + ".exe"
     };
 
     return variants[os.platform()];
