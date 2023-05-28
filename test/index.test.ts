@@ -7,7 +7,7 @@ import { KubescapeApi, KubescapeUi, IKubescapeConfig } from '../src/index'
 const seconds = (n : number) => n * 1000
 const minutes = (n : number) => n * 1000 * 60 
 
-const DEFAULT_KUBESCAPE_VERSION = "v2.0.176";
+const DEFAULT_KUBESCAPE_VERSION = "v2.3.1";
 
 class TestUi implements KubescapeUi {
     info(msg: string): void {
