@@ -1,18 +1,8 @@
 {
-  "name": "@kubescape/install",
-  "version": "0.4.3",
+  "name": "@tymaoa2/install",
+  "version": "0.1.2",
   "description": "Installing kubescape binaries for third parties",
-  "publisher": "kubescape",
-  "author": {
-    "name": "David Delarosa",
-    "email": "xdavidel@gmail.com"
-  },
-  "maintainers": [
-    {
-      "name": "Amir Malka",
-      "email": "amirm@armosec.io"
-    }
-  ],
+  "publisher": "mao",
   "main": "out/src/index.js",
   "files": [
     "out/src/index.d.ts"
@@ -25,14 +15,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kubescape/node-kubescape.git"
+    "url": "git+https://github.com/tymaoa2/node-kubescape.git"
   },
   "keywords": [
-    "kubescape",
-    "kubernetes",
-    "vscode",
-    "lens",
-    "containers"
+    "kubescape"
   ],
   "license": "Apache-2.0",
   "dependencies": {
