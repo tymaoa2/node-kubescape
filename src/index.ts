@@ -829,7 +829,7 @@ export class KubescapeApi {
      */
     async setup (ui : KubescapeUi, configs : IKubescapeConfig,
         abort : AbortController | undefined = undefined) : Promise<boolean> {
-        return ui.progress("Initializing kubescape", null, async(progress) : Promise<boolean> => {
+        return ui.progress("Initializing kubescape HIHI", null, async(progress) : Promise<boolean> => {
             /* initialize only once */
             if (this._isInitialized) return true
 
