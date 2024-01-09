@@ -262,10 +262,11 @@ async function getLatestVersion() : Promise<string> {
  * @param ui A set of UI fronts to display information graphically
  * @returns true on success
  */
-export async function install(version : string, kubescapeDir : string,
+export async function install(version : string, kubescapeUrl : string | undefined, kubescapeDir : string,
     ui : KubescapeUi, cancel : AbortController | undefined = undefined) : Promise<boolean> {
     /* set download url */
     let binaryUrl: string
+    ui.debug(`Customize downloading URL: ${kubescapeUrl}`)
 
     if (version === TXT_LATEST) {
         binaryUrl = await getLatestVersionUrl();
@@ -274,6 +275,10 @@ export async function install(version : string, kubescapeDir : string,
     }
 
     binaryUrl += `/${chooseKubescapeAsset()}`
+    if (kubescapeUrl) {
+        binaryUrl = kubescapeUrl
+    }
+    ui.debug(`Kubescape downloading URL: ${binaryUrl}`)
 
     const kubescapeName = getOsKubescapeFilename();
     const kubescapeFullPath = await downloadFile(binaryUrl, kubescapeDir, kubescapeName, cancel, ui, !isWindows());
@@ -356,6 +361,7 @@ export interface IKubescapeConfig {
     baseDirectory : string
     requiredFrameworks : string[] | undefined
     scanFrameworks : string[] | undefined
+    binaryUrl: string | undefined
 }
 
 export class KubescapeApi {
@@ -883,7 +889,7 @@ export class KubescapeApi {
             /* ---------------------------------------------------------------*/
             if (needsUpdate) {
                 ui.debug(`Kubescape needs to be updated to version: ${configs.version}`)
-                this._isInstalled = await install(configs.version, this.directory, ui, abort)
+                this._isInstalled = await install(configs.version, configs.binaryUrl, this.directory, ui, abort)
                 if (!this.isInstalled) {
                     ui.error(ERROR_KUBESCAPE_NOT_INSTALLED)
                     abort.abort()
