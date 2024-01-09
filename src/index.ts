@@ -739,6 +739,8 @@ export class KubescapeApi {
             }
             
             const cmd = this._buildScanCommand(`"${path.resolve(filePath)}"`, null, args);
+            ui.debug(`running kubescape scan command: ${cmd}`);
+            ui.info(`running kubescape scan command: ${cmd}`);
             
             return await ui.slow<any>("Kubescape scanning", async () => {
                 return new Promise<any>(resolve => {
